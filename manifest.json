@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Instant Pop-up Dictionary",
+  "version": "1.0",
+  "description": "Shows a definition popup when you select a word.",
+  "permissions": ["scripting", "activeTab"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["style.css"]
+    }
+  ],
+  "host_permissions": ["https://freedictionaryapi.com/*"]
+}
