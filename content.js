@@ -7,23 +7,82 @@ document.addEventListener("mouseup", async (e) => {
     return;
   }
 
-  const url = `https://freedictionaryapi.com/api/v1/entries/en/${selection}`;
+  const initialVariations = new Set([
+    selection,
+    selection.toLowerCase(),
+    selection.charAt(0).toUpperCase() + selection.slice(1).toLowerCase(),
+  ]);
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Not found");
-    const data = await response.json();
+  const allDefinitions = new Map();
+  let wordsToFetch = new Set(initialVariations);
 
-    const entry = data.entries?.[0];
-    const partOfSpeech = entry?.partOfSpeech || "unknown";
-    const definition = entry?.senses?.[0]?.definition || "No definition found.";
-    const pronunciation = entry?.pronunciations?.[0]?.text || "";
+  while (wordsToFetch.size > 0) {
+    const currentDefinitions = await fetchDefinitions(wordsToFetch);
+    wordsToFetch.clear();
 
-    showPopup(e.pageX, e.pageY, selection, pronunciation, definition, partOfSpeech);
-  } catch {
-    showPopup(e.pageX, e.pageY, selection, "", "Definition not found.", "");
+    for (const def of currentDefinitions) {
+      if (!allDefinitions.has(def.definition)) {
+        allDefinitions.set(def.definition, def);
+
+        const pluralOfMatch = def.definition.match(/plural of ([a-zA-Z]+)/i);
+        if (pluralOfMatch && pluralOfMatch[1]) {
+          const baseWord = pluralOfMatch[1];
+          if (!initialVariations.has(baseWord) && !wordsToFetch.has(baseWord)) {
+            wordsToFetch.add(baseWord);
+          }
+        }
+      }
+    }
+  }
+
+  const definitionsArray = Array.from(allDefinitions.values());
+
+  if (definitionsArray.length > 0) {
+    showPopup(e.pageX, e.pageY, selection, definitionsArray);
+  } else {
+    showPopup(e.pageX, e.pageY, selection, [
+      {
+        definition: "No definition found.",
+        partOfSpeech: "",
+        pronunciation: "",
+      },
+    ]);
   }
 });
+
+async function fetchDefinitions(variations) {
+  const variationArray = Array.from(variations);
+  const requests = variationArray.map((word) =>
+    fetch(`https://freedictionaryapi.com/api/v1/entries/en/${word}`).then((res) => {
+      if (!res.ok) return null;
+      return res.json();
+    })
+  );
+
+  const results = await Promise.allSettled(requests);
+  const uniqueDefinitions = new Map();
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled" && result.value) {
+      const word = variationArray[index];
+      const data = result.value;
+      const entry = data.entries?.[0];
+      if (entry) {
+        const definitionText = entry.senses?.[0]?.definition || null;
+        if (definitionText && !uniqueDefinitions.has(definitionText)) {
+          uniqueDefinitions.set(definitionText, {
+            word: word,
+            definition: definitionText,
+            partOfSpeech: entry.partOfSpeech || "unknown",
+            pronunciation: entry.pronunciations?.[0]?.text || "",
+          });
+        }
+      }
+    }
+  });
+
+  return Array.from(uniqueDefinitions.values());
+}
 
 document.addEventListener("click", (e) => {
   if (popup && !popup.contains(e.target)) {
@@ -31,18 +90,51 @@ document.addEventListener("click", (e) => {
   }
 });
 
-function showPopup(x, y, word, phonetic, definition, pos) {
+function showPopup(x, y, word, definitions) {
   removePopup();
 
   popup = document.createElement("div");
   popup.className = "dictionary-popup";
-  popup.innerHTML = `
-    <strong>${word}</strong> <em>${phonetic}</em><br/>
-    <span>${definition} <i>(${pos})</i></span>
-  `;
-  popup.style.top = `${y + 10}px`;
-  popup.style.left = `${x + 10}px`;
+
+  let content = `<strong>${word}</strong>`;
+
+  definitions.forEach((def) => {
+    const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
+    content += `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
+  });
+
+  popup.innerHTML = content;
+
+  // Temporarily add to DOM to measure dimensions
+  popup.style.visibility = "hidden";
   document.body.appendChild(popup);
+  const popupWidth = popup.offsetWidth;
+  const popupHeight = popup.offsetHeight;
+
+  // Calculate position
+  let top = y + 10;
+  let left = x + 10;
+
+  if (left + popupWidth > window.innerWidth) {
+    left = x - popupWidth - 10;
+  }
+
+  if (top + popupHeight > window.innerHeight) {
+    top = y - popupHeight - 10;
+  }
+
+  if (top < 0) {
+    top = 10;
+  }
+  if (left < 0) {
+    left = 10;
+  }
+
+  popup.style.top = `${top}px`;
+  popup.style.left = `${left}px`;
+
+  // Make it visible
+  popup.style.visibility = "visible";
 }
 
 function removePopup() {
