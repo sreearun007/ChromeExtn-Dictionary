@@ -29,3 +29,8 @@ To load this extension locally for development or testing:
 4.  **Load Unpacked**: Click the "Load unpacked" button and select the directory where you saved the project files.
 
 The extension will now be active in your browser.
+
+## Attribution
+
+Definitions are sourced from [Wiktionary](https://www.wiktionary.org/) and licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+Data delivered via [FreeDictionaryAPI.com](https://freedictionaryapi.com).

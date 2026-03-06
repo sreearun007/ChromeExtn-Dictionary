@@ -11,3 +11,13 @@
   border-radius: 6px;
   color: #003366; /* Deep blue text */
 }
+
+.dictionary-popup a {
+  color: #003366;
+  text-decoration: underline;
+}
+
+.dictionary-popup small {
+  font-size: 11px;
+  color: #666;
+}

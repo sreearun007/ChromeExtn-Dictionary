@@ -66,15 +66,18 @@ async function fetchDefinitions(variations) {
     if (result.status === "fulfilled" && result.value) {
       const word = variationArray[index];
       const data = result.value;
-      const entry = data.entries?.[0];
-      if (entry) {
-        const definitionText = entry.senses?.[0]?.definition || null;
+      const sourceUrl = data.source?.url || "";
+      const entries = data.entries || [];
+      
+      for (const entry of entries) {
+        const definitionText = entry.senses?.[0]?.definition;
         if (definitionText && !uniqueDefinitions.has(definitionText)) {
           uniqueDefinitions.set(definitionText, {
             word: word,
             definition: definitionText,
             partOfSpeech: entry.partOfSpeech || "unknown",
             pronunciation: entry.pronunciations?.[0]?.text || "",
+            sourceUrl: sourceUrl
           });
         }
       }
@@ -96,12 +99,17 @@ function showPopup(x, y, word, definitions) {
   popup = document.createElement("div");
   popup.className = "dictionary-popup";
 
-  let content = `<strong>${word}</strong>`;
+  const firstSourceUrl = definitions[0]?.sourceUrl;
+  let content = firstSourceUrl && firstSourceUrl !== "" 
+    ? `<strong><a href="${firstSourceUrl}" target="_blank" rel="noopener noreferrer">${word}</a></strong>`
+    : `<strong>${word}</strong>`;
 
   definitions.forEach((def) => {
     const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
     content += `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
   });
+
+  content += '<hr/><small>Powered by <a href="https://freedictionaryapi.com" target="_blank" rel="noopener">FreeDictionaryAPI.com</a></small>';
 
   popup.innerHTML = content;
 
