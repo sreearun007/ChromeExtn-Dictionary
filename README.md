@@ -10,6 +10,7 @@ A lightweight and intelligent browser extension that provides instant definition
 - **Intelligent Pop-up Placement**: The pop-up is smart enough to reposition itself to avoid being cut off by the screen's edges, ensuring it's always fully visible.
 - **Clean and Minimalist UI**: A non-intrusive and clean interface that doesn't get in your way.
 - **Universal Compatibility**: Works seamlessly across all websites.
+- **Wikipedia Fallback**: If a dictionary definition isn't found, the extension automatically searches for a summary on Wikipedia.
 
 ## How to Use
 
@@ -34,3 +35,5 @@ The extension will now be active in your browser.
 
 Definitions are sourced from [Wiktionary](https://www.wiktionary.org/) and licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 Data delivered via [FreeDictionaryAPI.com](https://freedictionaryapi.com).
+
+Summaries for terms not found in the dictionary are sourced from [Wikipedia](https://www.wikipedia.org/).

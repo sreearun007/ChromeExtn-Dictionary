@@ -40,13 +40,18 @@ document.addEventListener("mouseup", async (e) => {
   if (definitionsArray.length > 0) {
     showPopup(e.pageX, e.pageY, selection, definitionsArray);
   } else {
-    showPopup(e.pageX, e.pageY, selection, [
-      {
-        definition: "No definition found.",
-        partOfSpeech: "",
-        pronunciation: "",
-      },
-    ]);
+    const wikipediaSummary = await fetchWikipediaSummary(selection);
+    if (wikipediaSummary) {
+      showPopup(e.pageX, e.pageY, selection, [wikipediaSummary]);
+    } else {
+      showPopup(e.pageX, e.pageY, selection, [
+        {
+          definition: "No definition found.",
+          partOfSpeech: "",
+          pronunciation: "",
+        },
+      ]);
+    }
   }
 });
 
@@ -99,17 +104,28 @@ function showPopup(x, y, word, definitions) {
   popup = document.createElement("div");
   popup.className = "dictionary-popup";
 
-  const firstSourceUrl = definitions[0]?.sourceUrl;
-  let content = firstSourceUrl && firstSourceUrl !== "" 
-    ? `<strong><a href="${firstSourceUrl}" target="_blank" rel="noopener noreferrer">${word}</a></strong>`
-    : `<strong>${word}</strong>`;
+  const firstDef = definitions[0];
+  const isWikipedia = firstDef?.source === 'Wikipedia';
+
+  let content = `<strong>${word}</strong>`;
+  if (!isWikipedia && firstDef?.sourceUrl) {
+    content = `<strong><a href="${firstDef.sourceUrl}" target="_blank" rel="noopener noreferrer">${word}</a></strong>`;
+  }
 
   definitions.forEach((def) => {
-    const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
-    content += `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
+    if (isWikipedia) {
+      content += `<br/><br/><span>${def.definition}</span>`;
+    } else {
+      const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
+      content += `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
+    }
   });
 
-  content += '<hr/><small>Powered by <a href="https://freedictionaryapi.com" target="_blank" rel="noopener">FreeDictionaryAPI.com</a></small>';
+  if (isWikipedia) {
+    content += `<hr/><small>Summary from <a href="${firstDef.sourceUrl}" target="_blank" rel="noopener">Wikipedia</a></small>`;
+  } else {
+    content += '<hr/><small>Powered by <a href="https://freedictionaryapi.com" target="_blank" rel="noopener">FreeDictionaryAPI.com</a></small>';
+  }
 
   popup.innerHTML = content;
 
@@ -143,6 +159,26 @@ function showPopup(x, y, word, definitions) {
 
   // Make it visible
   popup.style.visibility = "visible";
+}
+
+async function fetchWikipediaSummary(word) {
+  const formattedWord = word.replace(/ /g, "_");
+  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(formattedWord)}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.type === 'disambiguation' || !data.extract) {
+      return null;
+    }
+    return {
+      definition: data.extract,
+      source: 'Wikipedia',
+      sourceUrl: data.content_urls.desktop.page
+    };
+  } catch (error) {
+    return null;
+  }
 }
 
 function removePopup() {

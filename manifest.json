@@ -11,5 +11,8 @@
       "css": ["style.css"]
     }
   ],
-  "host_permissions": ["https://freedictionaryapi.com/*"]
+  "host_permissions": [
+    "https://freedictionaryapi.com/*",
+    "https://*.wikipedia.org/*"
+  ]
 }
