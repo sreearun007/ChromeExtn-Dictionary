@@ -21,3 +21,31 @@
   font-size: 11px;
   color: #666;
 }
+
+.dict-tabs {
+  border-bottom: 1px solid #b3d1ff;
+  margin-bottom: 10px;
+}
+
+.dict-tab-button {
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #003366;
+  border-bottom: 2px solid transparent;
+}
+
+.dict-tab-button.active {
+  border-bottom-color: #003366;
+  font-weight: bold;
+}
+
+.dict-tab-content {
+  display: none;
+}
+
+.dict-tab-content.active {
+  display: block;
+}

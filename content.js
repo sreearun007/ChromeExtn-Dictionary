@@ -2,11 +2,38 @@ let popup;
 
 document.addEventListener("mouseup", async (e) => {
   const selection = window.getSelection().toString().trim();
-  if (!selection) {
+  if (!selection || selection.split(' ').length > 5) {
     removePopup();
     return;
   }
 
+  const [dictionaryResults, wikipediaResult] = await Promise.all([
+    fetchDictionaryDefinitions(selection),
+    fetchWikipediaSummary(selection),
+  ]);
+
+  const results = {};
+  if (dictionaryResults.length > 0) {
+    results.dictionary = dictionaryResults;
+  }
+  if (wikipediaResult) {
+    results.wikipedia = [wikipediaResult];
+  }
+
+  if (Object.keys(results).length > 0) {
+    showPopup(e.pageX, e.pageY, selection, results);
+  } else {
+    showPopup(e.pageX, e.pageY, selection, {
+      fallback: [{
+        definition: "No definition found.",
+        partOfSpeech: "",
+        pronunciation: "",
+      }],
+    });
+  }
+});
+
+async function fetchDictionaryDefinitions(selection) {
   const initialVariations = new Set([
     selection,
     selection.toLowerCase(),
@@ -34,26 +61,8 @@ document.addEventListener("mouseup", async (e) => {
       }
     }
   }
-
-  const definitionsArray = Array.from(allDefinitions.values());
-
-  if (definitionsArray.length > 0) {
-    showPopup(e.pageX, e.pageY, selection, definitionsArray);
-  } else {
-    const wikipediaSummary = await fetchWikipediaSummary(selection);
-    if (wikipediaSummary) {
-      showPopup(e.pageX, e.pageY, selection, [wikipediaSummary]);
-    } else {
-      showPopup(e.pageX, e.pageY, selection, [
-        {
-          definition: "No definition found.",
-          partOfSpeech: "",
-          pronunciation: "",
-        },
-      ]);
-    }
-  }
-});
+  return Array.from(allDefinitions.values());
+}
 
 async function fetchDefinitions(variations) {
   const variationArray = Array.from(variations);
@@ -98,36 +107,84 @@ document.addEventListener("click", (e) => {
   }
 });
 
-function showPopup(x, y, word, definitions) {
+function showPopup(x, y, word, results) {
   removePopup();
 
   popup = document.createElement("div");
   popup.className = "dictionary-popup";
-
-  const firstDef = definitions[0];
-  const isWikipedia = firstDef?.source === 'Wikipedia';
-
-  let content = `<strong>${word}</strong>`;
-  if (!isWikipedia && firstDef?.sourceUrl) {
-    content = `<strong><a href="${firstDef.sourceUrl}" target="_blank" rel="noopener noreferrer">${word}</a></strong>`;
-  }
-
-  definitions.forEach((def) => {
-    if (isWikipedia) {
-      content += `<br/><br/><span>${def.definition}</span>`;
-    } else {
-      const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
-      content += `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
+  popup.addEventListener('mouseup', (e) => {
+    if (e.target.classList.contains('dict-tab-button')) {
+      e.stopPropagation();
     }
   });
 
-  if (isWikipedia) {
-    content += `<hr/><small>Summary from <a href="${firstDef.sourceUrl}" target="_blank" rel="noopener">Wikipedia</a></small>`;
-  } else {
-    content += '<hr/><small>Powered by <a href="https://freedictionaryapi.com" target="_blank" rel="noopener">FreeDictionaryAPI.com</a></small>';
+  const hasDictionary = results.dictionary && results.dictionary.length > 0;
+  const hasWikipedia = results.wikipedia && results.wikipedia.length > 0;
+
+  let content = `<strong>${word}</strong>`;
+  let tabs = '';
+  let tabContents = '';
+
+  if (hasDictionary && hasWikipedia) {
+    tabs = `
+      <div class="dict-tabs">
+        <button class="dict-tab-button active" data-tab="dictionary">Dictionary</button>
+        <button class="dict-tab-button" data-tab="wikipedia">Wikipedia</button>
+      </div>
+    `;
   }
 
-  popup.innerHTML = content;
+  if (hasDictionary) {
+    const dictionaryContent = results.dictionary.map(def => {
+      const wordSearched = def.word ? `<strong>(${def.word})</strong> ` : "";
+      return `<br/><br/>${wordSearched}<em>${def.pronunciation || ""}</em> <span>${def.definition} <i>(${def.partOfSpeech || ""})</i></span>`;
+    }).join('');
+    tabContents += `<div class="dict-tab-content active" data-tab-content="dictionary">${dictionaryContent}</div>`;
+  }
+
+  if (hasWikipedia) {
+    const wikipediaContent = results.wikipedia.map(def => `<br/><br/><span>${def.definition}</span>`).join('');
+    const wikipediaActiveClass = hasDictionary ? '' : ' active';
+    tabContents += `<div class="dict-tab-content${wikipediaActiveClass}" data-tab-content="wikipedia">${wikipediaContent}</div>`;
+  }
+
+  if (results.fallback) {
+    content += `<br/><br/><span>${results.fallback[0].definition}</span>`;
+  }
+
+  let attribution = '<hr/><small>';
+  if (hasDictionary) {
+    attribution += 'Powered by <a href="https://freedictionaryapi.com" target="_blank" rel="noopener">FreeDictionaryAPI.com</a>';
+  }
+  if (hasDictionary && hasWikipedia) {
+    attribution += ' & ';
+  }
+  if (hasWikipedia) {
+    attribution += 'Summary from <a href="' + results.wikipedia[0].sourceUrl + '" target="_blank" rel="noopener">Wikipedia</a>';
+  }
+  attribution += '</small>';
+
+  popup.innerHTML = content + tabs + tabContents + attribution;
+
+  if (hasDictionary && hasWikipedia) {
+    const tabButtons = popup.querySelectorAll('.dict-tab-button');
+    const tabContentsElements = popup.querySelectorAll('.dict-tab-content');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+
+        tabContentsElements.forEach(content => {
+          if (content.dataset.tabContent === button.dataset.tab) {
+            content.classList.add('active');
+          } else {
+            content.classList.remove('active');
+          }
+        });
+      });
+    });
+  }
 
   // Temporarily add to DOM to measure dimensions
   popup.style.visibility = "hidden";
